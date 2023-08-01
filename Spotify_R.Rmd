@@ -1,6 +1,6 @@
 ---
-title: "DSA2101GrpProject"
-author: "hui xuan"
+title: "Spotify data analysis"
+author: "Hyeonah"
 date: "2023-03-19"
 output: html_document
 ---
