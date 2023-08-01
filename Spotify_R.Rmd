@@ -1,0 +1,267 @@
+---
+title: "DSA2101GrpProject"
+author: "hui xuan"
+date: "2023-03-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(zoo)
+```
+
+## Loading in the Dataset
+
+
+
+```{r billboard, echo = FALSE}
+billboard <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-14/billboard.csv')
+
+# do we need this?
+audio_features <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-14/audio_features.csv')
+```
+
+
+```{r}
+#print(max(na.omit(audio_features)%>%select(spotify_track_popularity)))
+#print(na.omit(audio_features)%>%filter(spotify_track_popularity>=90))
+#print(audio_features)
+billboard
+print(billboard %>% select(weeks_on_chart)%>% max())
+longest_run
+avg_week_position <- mean(billboard$weeks_on_chart)
+avg_week_position
+std_dev <- sd(billboard$weeks_on_chart)
+std_dev
+date=billboard %>% select(week_id) %>% unique()
+date
+
+options(scipen = 999)
+audio_features_summary <- audio_features %>%
+  select(spotify_track_duration_ms,danceability,energy,key,loudness,speechiness,acousticness, instrumentalness, liveness, valence, tempo, time_signature,spotify_track_popularity)%>%
+  gather(key = "factors", value = "value") %>%
+  group_by(factors) %>%
+  summarize(mean = mean(value, na.rm = TRUE), standard_deviation = sd(value, na.rm = TRUE)) %>%
+  select(variable, mean, standard_deviation)
+audio_features_summary
+
+audio_features %>% select(performer) %>% unique()
+```
+## Exploring the Data
+
+Some important details about each column 
+
+```{r}
+# shape, column types, summary, structure of the dataset
+#dim(billboard) # 10 columns of dataset with 327895 observations
+#str(billboard) # url, week_id, song, performer, song_id chr, the rest numerics
+billboard_dates=billboard %>% separate(week_id, into=c("day", "month", "year"), sep="/", remove=FALSE) %>%
+mutate(day=as.numeric(day), month=as.numeric(month), year=as.numeric(year), date=as.Date(week_id,format = "%m/%d/%Y")) 
+
+# %>% mutate_at(vars(week_id, day, month, year), as.numeric)
+print(billboard_dates)
+print(billboard_dates %>% select(year) %>% unique() %>% max())
+```
+
+
+```{r}
+audio_features %>% filter(spotify_track_popularity>95)
+
+
+```
+```{r}
+#billboard  %>% select(song, performer, date) %>% arrange(date)
+
+billboard= billboard %>% left_join(audio_features, by = c("performer","song")) %>% 
+  separate(week_id, into=c("day", "month", "year"), sep="/", remove=FALSE) %>%
+  mutate(year=as.numeric(year), date=as.Date(week_id,format = "%m/%d/%Y")) %>%
+  mutate(billboard_popularity=101-week_position)
+
+billboard = na.omit(billboard)
+billboard
+
+# Compute the correlation between variables
+#correlation_matrix <- cor(merged_df[c("tempo", "danceability", "spotify_track_popularity")])
+
+# View the correlation matrix
+#correlation_matrix
+
+```
+```{r}
+by_year <- billboard %>%
+  group_by(year) %>%
+  summarise(cor_tempo_popularity = cor(tempo, billboard_popularity, use = "complete.obs"),
+            cor_danceability_popularity = cor(danceability, billboard_popularity, use = "complete.obs"),
+            cor_energy_popularity= cor(energy, billboard_popularity, use = "complete.obs"),
+            cor_loudness_popularity= cor(loudness, billboard_popularity, use = "complete.obs"),
+            cor_speechiness_popularity= cor(speechiness, billboard_popularity, use = "complete.obs"),
+            cor_acousticness_popularity= cor(acousticness, billboard_popularity, use = "complete.obs"),
+            cor_instrumentalness_popularity= cor(instrumentalness, billboard_popularity, use = "complete.obs"),
+            cor_liveness_popularity= cor(liveness, billboard_popularity, use = "complete.obs"),
+            cor_valence_popularity= cor(valence, billboard_popularity, use = "complete.obs"),
+            )
+by_year
+
+
+
+moving_average <- by_year  %>%
+  #mutate(cor_tempo_popularity = lag(zoo::rollapply(cor_tempo_popularity, width = 10, FUN = mean, fill = NA, align = "right", partial = TRUE), n = 1))
+  mutate_at(vars(-year), ~ lag(zoo::rollapply(.x, width = 10, FUN = mean, fill = NA, align = "right", partial = TRUE), n = 1))
+moving_average
+ggplot(data = moving_average, aes(x = year)) +
+  geom_line(aes(y = cor_tempo_popularity, color = "Tempo-Popularity")) 
+
+ggplot(data = by_year, aes(x = year)) +
+  #geom_line(aes(y = cor_loudness_popularity, color = "Loudness-Popularity")) +
+  #geom_line(aes(y = cor_speechiness_popularity, color = "Speechiness-Popularity")) +
+  #geom_line(aes(y = cor_acousticness_popularity, color = "Acousticness-Popularity"))+
+  geom_smooth(aes(y = cor_tempo_popularity, color = "Tempo-Popularity") ,alpha=0.1, se = FALSE) +
+  geom_smooth(aes(y = cor_danceability_popularity, color = "Danceability-Popularity"),alpha=0.5,  se = FALSE) +
+  geom_smooth(aes(y = cor_energy_popularity, color = "Energy-Popularity"),se = FALSE) +
+  #geom_line(aes(y = cor_loudness_popularity, color = "Loudness-Popularity")) +
+  #geom_line(aes(y = cor_speechiness_popularity, color = "Speechiness-Popularity")) +
+  #geom_line(aes(y = cor_acousticness_popularity, color = "Acousticness-Popularity")) +
+  #geom_line(aes(y = cor_instrumentalness_popularity, color = "Instrumentalness-Popularity")) +
+  #geom_line(aes(y = cor_liveness_popularity, color = "Liveness-Popularity")) +
+  #geom_line(aes(y = cor_valence_popularity, color = "Valence-Popularity")) +
+  #scale_color_manual(values = c("blue", "red", "green", "purple", "orange", "cyan", "magenta", "brown", "black")) +
+  xlab("Year") +
+  ylab("Correlation") +
+  ggtitle("Correlations between Audio Features and Spotify Track Popularity by Year")
+  
+
+# Compute the correlation between variables by year
+#correlation_matrix <- by_year %>%
+  #select(tempo, danceability, spotify_track_popularity) %>%
+  #cor()
+```
+
+
+```{r}
+#by_year <- merged_df %>%
+  #group_by(year) %>%
+  #summarise(across(c(tempo, danceability, spotify_track_popularity), mean))
+
+# Compute the correlation between variables by year
+#correlation_matrix <- by_year %>%
+  #select(tempo, danceability, spotify_track_popularity) %>%
+  #cor()
+correlations_by_year=merged_df %>% group_by(year) %>% 
+  summarise(cor_tempo_popularity = cor(tempo, spotify_track_popularity, use = "complete.obs"),
+            cor_danceability_popularity = cor(danceability, spotify_track_popularity, use = "complete.obs"),
+            cor_energy_popularity= cor(energy, spotify_track_popularity, use = "complete.obs"),
+            cor_loudness_popularity= cor(loudness, spotify_track_popularity, use = "complete.obs"),
+            cor_speechiness_popularity= cor(speechiness, spotify_track_popularity, use = "complete.obs"),
+            cor_acousticness_popularity= cor(acousticness, spotify_track_popularity, use = "complete.obs"),
+            cor_instrumentalness_popularity= cor(instrumentalness, spotify_track_popularity, use = "complete.obs"),
+            cor_liveness_popularity= cor(liveness, spotify_track_popularity, use = "complete.obs"),
+            cor_valence_popularity= cor(valence, spotify_track_popularity, use = "complete.obs"),
+            )
+
+
+correlations_by_year
+```
+
+```{r}
+p=ggplot(correlations_by_year) +
+  geom_line(aes(x=year, y=cor_danceability_popularity, color = "danceability-popularity")) +
+  geom_line(aes(x=year, y=cor_tempo_popularity, color = "tempo-popularity")) +
+  geom_line(aes(x=year, y=cor_energy_popularity, color = "energy-popularity")) +
+  geom_line(aes(x=year, y=cor_loudness_popularity, color = "loudness-popularity")) +
+  geom_line(aes(x=year, y=cor_speechiness_popularity, color = "speechiness-popularity")) +
+  labs(x = "Year", y = "correlation", color = "cor",
+       title = "Correlations",
+       subtitle = "Danceability and tempo") +
+  scale_color_manual(values = c("danceability-popularity" = "blue",
+                                "tempo-popularity" = "red",
+                                "energy-popularity" = "green",
+                                "loudness-popularity" = "purple",
+                                "speechiness-popularity" = "orange"))+
+  expand_limits(x = c(2000, 2020))
+p
+#ggsave("correlations.png", p, width = 12, height = 8, units = "in", dpi = 300)
+```
+
+```{r}
+correlations=audio_features %>% 
+  summarise(cor_tempo= cor(tempo, spotify_track_popularity, use = "complete.obs"),
+            cor_danceability = cor(danceability, spotify_track_popularity, use = "complete.obs"),
+            cor_energy= cor(energy, spotify_track_popularity, use = "complete.obs"),
+            cor_loudness= cor(loudness, spotify_track_popularity, use = "complete.obs"),
+            cor_speechiness= cor(speechiness, spotify_track_popularity, use = "complete.obs"),
+            cor_acousticness= cor(acousticness, spotify_track_popularity, use = "complete.obs"),
+            cor_instrumentalness= cor(instrumentalness, spotify_track_popularity, use = "complete.obs"),
+            cor_liveness= cor(liveness, spotify_track_popularity, use = "complete.obs"),
+            cor_valence= cor(valence, spotify_track_popularity, use = "complete.obs"),
+            )
+
+correlations_1=gather(data = correlations, key = "variable", value = "value")
+
+ggplot(correlations_1, aes(x = variable, y = value)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  xlab("Variable") +
+  ylab("Correlation with Popularity")+
+  coord_flip()
+
+```
+```{r}
+perf = billboard %>%
+  separate(week_id, into = c("month", "day", "year"), sep = "/") %>%
+  filter(year >= 2010 & year <= 2020, week_position <= 10) %>%
+  group_by(performer) %>%
+  summarise(no_weeks = n())
+
+perf_top_5 = perf %>% slice_max(no_weeks, n = 5) %>% pull(performer)
+
+filtered_data <- audio %>%
+  filter(performer %in% perf_top_5) %>%
+  inner_join(billboard, by = c("song_id", "performer"), multiple = "all") %>%
+  separate(week_id, into = c("month", "day", "year"), sep = "/") %>%
+  mutate(year = as.numeric(year)) %>%
+  filter(year >= 2010 & year <= 2020) %>%
+  select(performer, spotify_track_popularity, year, week_position)
+  
+
+
+# Filter data to include only the top 5 performers
+filtered_data <- audio %>%
+  filter(performer %in% perf_top_5) %>%
+  inner_join(billboard, by = c("song_id", "performer"), multiple = "all") %>%
+  separate(week_id, into = c("month", "day", "year"), sep = "/") %>%
+  mutate(year = as.numeric(year)) %>%
+  filter(year >= 2010 & year <= 2020) %>%
+  select(performer, spotify_track_popularity, year, week_position)
+
+# Use linear interpolation to impute missing data for Bruno Mars and The Weeknd
+filtered_data_imputed <- filtered_data %>%
+  group_by(performer) %>%
+  mutate(week_position_interp = na.approx(week_position, na.rm = FALSE))
+
+# Calculate average popularity per year for each performer
+avg_popularity_imputed <- filtered_data_imputed %>%
+  group_by(performer, year) %>%
+  summarise(avg_popularity = mean(week_position_interp, na.rm = TRUE), .groups = "drop")
+
+# Create the line graph using ggplot2
+line_graph_imputed <- ggplot(avg_popularity_imputed, aes(x = year, y = avg_popularity, group = performer, color = performer)) +
+  geom_line(linewidth = 1, alpha = 0.7) +
+  geom_point(alpha = 0.7) +
+  scale_x_continuous(breaks = seq(2010, 2020, 1)) +
+  scale_y_reverse() +
+  labs(title = "Average Popularity of Top 5 Performers (2010-2020) (Imputed Data)",
+       subtitle = "Top 5 performers are those with the most weeks spent in the top 10 positions",
+       x = "Year",
+       y = "Weekly Position",
+       color = "Performer") +
+  theme_minimal()
+
+# Print the line graph
+print(line_graph_imputed)
+
+
+
+```
