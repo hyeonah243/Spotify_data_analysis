@@ -21,25 +21,11 @@ library(zoo)
 ```{r billboard, echo = FALSE}
 billboard <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-14/billboard.csv')
 
-# do we need this?
 audio_features <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-14/audio_features.csv')
 ```
 
 
 ```{r}
-#print(max(na.omit(audio_features)%>%select(spotify_track_popularity)))
-#print(na.omit(audio_features)%>%filter(spotify_track_popularity>=90))
-#print(audio_features)
-billboard
-print(billboard %>% select(weeks_on_chart)%>% max())
-longest_run
-avg_week_position <- mean(billboard$weeks_on_chart)
-avg_week_position
-std_dev <- sd(billboard$weeks_on_chart)
-std_dev
-date=billboard %>% select(week_id) %>% unique()
-date
-
 options(scipen = 999)
 audio_features_summary <- audio_features %>%
   select(spotify_track_duration_ms,danceability,energy,key,loudness,speechiness,acousticness, instrumentalness, liveness, valence, tempo, time_signature,spotify_track_popularity)%>%
@@ -47,6 +33,7 @@ audio_features_summary <- audio_features %>%
   group_by(factors) %>%
   summarize(mean = mean(value, na.rm = TRUE), standard_deviation = sd(value, na.rm = TRUE)) %>%
   select(variable, mean, standard_deviation)
+
 audio_features_summary
 
 audio_features %>% select(performer) %>% unique()
@@ -57,12 +44,10 @@ Some important details about each column
 
 ```{r}
 # shape, column types, summary, structure of the dataset
-#dim(billboard) # 10 columns of dataset with 327895 observations
+#dim(billboard) # [327895, 10]
 #str(billboard) # url, week_id, song, performer, song_id chr, the rest numerics
 billboard_dates=billboard %>% separate(week_id, into=c("day", "month", "year"), sep="/", remove=FALSE) %>%
 mutate(day=as.numeric(day), month=as.numeric(month), year=as.numeric(year), date=as.Date(week_id,format = "%m/%d/%Y")) 
-
-# %>% mutate_at(vars(week_id, day, month, year), as.numeric)
 print(billboard_dates)
 print(billboard_dates %>% select(year) %>% unique() %>% max())
 ```
